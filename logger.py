@@ -1,28 +1,42 @@
 import serial
+import sys
 import time
 
 
 COM = "/dev/ttyUSB0"
 
-maps = {"0C": ("RPM", lambda a, b: (a * 256 + b) / 4)}
+maps = {
+    "0C": ("RPM", lambda a, b: (a * 256 + b) / 4),
+    "0D": ("KPH", lambda a: a)
+       }
 
 # set up
 ser = serial.Serial(COM, timeout=1)
+
+# reset device
 ser.write("ATZ\r")
-time.sleep(4)
-print ser.readline()
-print ser.readline()
-print ser.readline()
+time.sleep(5)
+ser.readline()
 
+# set timeout to 40ms
+ser.write("ATST 10\r")
+time.sleep(1)
+ser.readline()
 
-# main stuff
+# set adaptive timing to aggressive
+ser.write("ATAT2\r")
+time.sleep(1)
+ser.readline()
+
+# read maps
 while True:
+
+    sys.stdout.write("{0}, ".format(time.time()))
+
     for hex, (units, func) in maps.items():
 
         # prepare the outgoing request
         req = "01{0}".format(hex)
-
-        print " > {0}".format(req)
 
         # send the request
         ser.write("{0}\r".format(req))
@@ -30,11 +44,10 @@ while True:
         # the data, sans newline and header data, parsed into tokens
         res = ser.readline().strip().split(" ")[2:-1]
 
-        print " < {0}".format(res)
-
         # parse the result into token, de-hexifier
         tokens = [ord(chr(int(t, 16))) for t in res]
         val = func(*tokens)
 
-        print "{0} {1}".format(val, units)
-        time.sleep(0.1)
+        sys.stdout.write("{0} {1},".format(val, units))
+
+    sys.stdout.write("\n")
