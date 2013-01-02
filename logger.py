@@ -7,32 +7,54 @@ import threading
 import time
 
 
-def blockdump():
-    """ blocks on Enter key, then dumps buffer
-    """
-    raw_input("Press Enter to dump results...")
-    global buffer
-    with open("test.txt", "a") as f:
-        f.write("----\n")
-        for line in buffer:
-            f.write(line + "\n")
-    blockdump()
+# rotating buffer of data
+buffer = collections.deque([], maxlen=10000)
 
-buffer = collections.deque([], maxlen=1000)
-
+# settings
 COM = "/dev/ttyUSB0"
 COM = "COM9"
 
 maps = {
-#    "03": ("Fuel Sys 1 Mode", lambda a, b: a),
+    "03": ("Fuel Sys 1 Mode", lambda a, b: a),
 #    "04": ("%Load", lambda a: (a / 255) * 100),
-#    "0C": ("RPM", lambda a, b: (a * 256 + b) / 4),
+    "0C": ("RPM", lambda a, b: (a * 256 + b) / 4),
 #    "0D": ("KPH", lambda a: a),
 #    "0E": ("Timing advance", lambda a: (a / 2) - 64),
-    "11": ("% Throttle", lambda a: (a * 100) / 255),
-    "49": ("% Accelerator Pedal A", lambda a: (a * 100) / 255),
-    "4A": ("% Accelerator Pedal B", lambda a: (a * 100) / 255),
-       }
+#    "11": ("% Throttle", lambda a: (a * 100) / 255),
+#    "49": ("% Accelerator Pedal A", lambda a: (a * 100) / 255),
+#    "4A": ("% Accelerator Pedal B", lambda a: (a * 100) / 255),
+}
+
+# helper method
+def blockdump():
+    """ blocks on Enter key, then dumps buffer
+    """
+    global buffer
+    global maps
+
+    raw_input("Press Enter to dump results...")
+
+    dumptime = datetime.datetime.now().strftime("%Y_%m_%d-%H_%M_%S.%f")
+    filename = "dump-{0}.txt".format(dumptime)
+
+    with open(filename, "a") as f:
+
+        # write headers
+        f.write("Time, ")
+        for hex, (units, func) in sorted(maps.items()):
+            f.write("{0}, ".format(units))
+        f.write("\n")
+
+        # write buffer
+        for line in buffer:
+            f.write(line + "\n")
+
+        # beep
+        print chr(7)
+
+    # restart self
+    blockdump()
+
 
 # set up
 ser = serial.Serial(COM, timeout=0.05, baudrate=9600, xonxoff=True)
@@ -48,14 +70,6 @@ time.sleep(1)
 # set adaptive timing to aggressive
 ser.write("ATAT2\r")
 time.sleep(1)
-
-# print headers to file
-with open("test.txt", "a") as f:
-    f.write(datetime.datetime.now().strftime("%d/%m/%Y\n"))
-    f.write("Time, ")
-    for hex, (units, func) in sorted(maps.items()):
-        f.write("{0}, ".format(units))
-    f.write("\n")
 
 # set up buffer dumper :)
 threading.Thread(target=blockdump).start()
