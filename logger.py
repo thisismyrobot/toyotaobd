@@ -20,7 +20,7 @@ maps = {
     "0C": ("RPM", lambda a, b: (a * 256 + b) / 4),
 #    "0D": ("KPH", lambda a: a),
 #    "0E": ("Timing advance", lambda a: (a / 2) - 64),
-#    "11": ("% Throttle", lambda a: (a * 100) / 255),
+    "11": ("% Throttle", lambda a: (a * 100) / 255),
 #    "49": ("% Accelerator Pedal A", lambda a: (a * 100) / 255),
 #    "4A": ("% Accelerator Pedal B", lambda a: (a * 100) / 255),
 }
@@ -57,7 +57,7 @@ def blockdump():
 
 
 # set up
-ser = serial.Serial(COM, timeout=0.05, baudrate=9600, xonxoff=True)
+ser = serial.Serial(COM, timeout=1, baudrate=9600, xonxoff=True)
 
 # reset device
 ser.write("ATZ\r")
@@ -89,13 +89,14 @@ while True:
         # send the request
         ser.write("{0}\r".format(req))
 
-        # the data, sans newline and header data
-        rl = ""
-        while rl == "":
-            rl = ser.readline().strip()
-        ser.flushInput()
+        # work out how long the response will be
+        result_len = 14 + (func.func_code.co_argcount * 3)
 
-        res = rl.split(" ")[2:-1]
+        # read the data bytes
+        data = ser.read(result_len)
+
+        # get the actual returned OBD info for the PID
+        res = data.split(" ")[2:-1]
 
         # parse the result into token, de-hexifier
         tokens = [ord(chr(int(t, 16))) for t in res]
